@@ -52,7 +52,7 @@ Respond ONLY with a valid JSON object (no markdown, no backticks, no preamble):
   "sentiment_positive": <integer>,
   "sentiment_negative": <integer>,
   "sentiment_neutral": <integer>,
-  "overall_sentiment": "<Positive|Negative|Neutral|Mixed>",
+  "overall_sentiment": "<Positive|Negative|Mixed|Neutral>",
   "summary": "<3-4 sentence summary of current coverage and public perception>",
   "key_insight": "<single most important insight right now>",
   "trending_keywords": ["<w1>","<w2>","<w3>","<w4>","<w5>","<w6>","<w7>","<w8>","<w9>","<w10>"],
@@ -135,77 +135,126 @@ Rules: 8-12 articles. Sentiment percentages must add up to exactly 100. Every UR
   }
 });
 
-// Demo data generator (used when no API key or on error)
+// ─── FIXED Demo data generator ───────────────────────────────────────────────
+// Each keyword now gets unique, realistic data derived from the keyword itself
 function generateDemoData(keyword) {
   const today = new Date();
   const fmtDate = (d) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
+  // Deterministic-ish seed from keyword so same keyword = same data,
+  // but different keywords = genuinely different data
+  const seed = keyword.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  const seededRand = (min, max, offset = 0) => {
+    const s = (seed + offset) % 97;
+    return min + (s % (max - min + 1));
+  };
+  // True random for things that should vary every call (reach, engagement)
   const ri = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
-  const POS = ["good","great","excellent","amazing","positive","success","win","best","growth","rise","gain","profit","breakthrough","strong","advance","improve","benefit","boom","surge","record","milestone","launch","achieve","innovative","leading","popular","viral","bullish","upgrade","safe","trust"];
-  const NEG = ["bad","terrible","negative","fail","loss","worst","hate","sad","decline","fall","drop","crash","problem","issue","concern","crisis","controversy","scandal","attack","threat","risk","danger","protest","ban","lawsuit","fraud","scam","mislead","conflict","violence","corruption","disaster","bearish","recall","unsafe"];
+  // ── Sentiment profile: keyword-driven, not hardcoded ──────────────────────
+  const positiveKeywords = ["apple","iphone","isro","cricket","virat","ai","chatgpt","bitcoin","tesla","growth","innovation","award","launch","success","win","gold"];
+  const negativeKeywords  = ["politics","election","controversy","war","scam","fraud","crash","ban","protest","violence","corruption","crisis","lawsuit","recall","death","accident"];
 
-  function analyzeSentiment(text) {
-    const t = text.toLowerCase();
-    let pos = 0, neg = 0;
-    POS.forEach(w => { if (t.includes(w)) pos++; });
-    NEG.forEach(w => { if (t.includes(w)) neg++; });
-    if (pos > neg) return { label: "positive", score: Math.min(0.9, 0.3 + pos * 0.1) };
-    if (neg > pos) return { label: "negative", score: Math.max(-0.9, -(0.3 + neg * 0.1)) };
-    return { label: "neutral", score: 0.0 };
-  }
+  const kwLower = keyword.toLowerCase();
+  let basePosChance = 40; // default neutral-ish
+  positiveKeywords.forEach(w => { if (kwLower.includes(w)) basePosChance += 15; });
+  negativeKeywords.forEach(w  => { if (kwLower.includes(w)) basePosChance -= 15; });
+  basePosChance = Math.min(75, Math.max(15, basePosChance));
 
+  // Add seeded jitter so two different keywords don't land identically
+  const jitter = (seededRand(0, 20, 7) - 10); // -10 to +10
+  const pct_pos = Math.min(80, Math.max(10, basePosChance + jitter));
+  const pct_neg = Math.min(60, Math.max(5,  Math.floor((100 - pct_pos) * (0.3 + (seededRand(0,30,13) / 100)))));
+  const pct_neu = 100 - pct_pos - pct_neg;
+  const overall = pct_pos >= 55 ? "Positive" : pct_neg >= 45 ? "Negative" : pct_pos > pct_neg ? "Mixed" : "Neutral";
+
+  // Total articles: keyword-seeded so two keywords look different
+  const total = seededRand(8, 14, 3);
+
+  // ── Article generation ────────────────────────────────────────────────────
   const mockSources = [
-    { name: "NDTV", type: "News", url: (q) => `https://www.ndtv.com/search?searchtext=${encodeURIComponent(q)}` },
-    { name: "Times of India", type: "News", url: (q) => `https://timesofindia.indiatimes.com/topic/${encodeURIComponent(q)}` },
-    { name: "The Hindu", type: "News", url: (q) => `https://www.thehindu.com/search/?q=${encodeURIComponent(q)}` },
-    { name: "Economic Times", type: "News", url: (q) => `https://economictimes.indiatimes.com/topic/${encodeURIComponent(q)}` },
-    { name: "Hindustan Times", type: "News", url: (q) => `https://www.hindustantimes.com/search?q=${encodeURIComponent(q)}` },
-    { name: "TechCrunch", type: "Blog", url: (q) => `https://techcrunch.com/search/${encodeURIComponent(q)}/` },
-    { name: "Medium", type: "Blog", url: (q) => `https://medium.com/search?q=${encodeURIComponent(q)}` },
-    { name: "Reddit", type: "Forum", url: (q) => `https://www.reddit.com/search/?q=${encodeURIComponent(q)}` },
-    { name: "Quora", type: "Forum", url: (q) => `https://www.quora.com/search?q=${encodeURIComponent(q)}` },
-    { name: "LinkedIn", type: "Social", url: (q) => `https://www.linkedin.com/search/results/content/?keywords=${encodeURIComponent(q)}` }
+    { name: "NDTV",           type: "News",   url: (q) => `https://www.ndtv.com/search?searchtext=${encodeURIComponent(q)}` },
+    { name: "Times of India", type: "News",   url: (q) => `https://timesofindia.indiatimes.com/topic/${encodeURIComponent(q)}` },
+    { name: "The Hindu",      type: "News",   url: (q) => `https://www.thehindu.com/search/?q=${encodeURIComponent(q)}` },
+    { name: "Economic Times", type: "News",   url: (q) => `https://economictimes.indiatimes.com/topic/${encodeURIComponent(q)}` },
+    { name: "Hindustan Times",type: "News",   url: (q) => `https://www.hindustantimes.com/search?q=${encodeURIComponent(q)}` },
+    { name: "TechCrunch",     type: "Blog",   url: (q) => `https://techcrunch.com/search/${encodeURIComponent(q)}/` },
+    { name: "Medium",         type: "Blog",   url: (q) => `https://medium.com/search?q=${encodeURIComponent(q)}` },
+    { name: "Reddit",         type: "Forum",  url: (q) => `https://www.reddit.com/search/?q=${encodeURIComponent(q)}` },
+    { name: "Quora",          type: "Forum",  url: (q) => `https://www.quora.com/search?q=${encodeURIComponent(q)}` },
+    { name: "LinkedIn",       type: "Social", url: (q) => `https://www.linkedin.com/search/results/content/?keywords=${encodeURIComponent(q)}` }
   ];
 
-  const sentPat = ["positive","positive","positive","negative","negative","neutral","neutral","positive","negative","neutral"];
+  // Build a sentiment distribution array matching our pct targets
+  const sentDist = [];
+  const nPos = Math.round((pct_pos / 100) * total);
+  const nNeg = Math.round((pct_neg / 100) * total);
+  const nNeu = total - nPos - nNeg;
+  for (let i = 0; i < nPos; i++) sentDist.push("positive");
+  for (let i = 0; i < nNeg; i++) sentDist.push("negative");
+  for (let i = 0; i < Math.max(0, nNeu); i++) sentDist.push("neutral");
+  // Shuffle deterministically using seed
+  for (let i = sentDist.length - 1; i > 0; i--) {
+    const j = (seed + i * 7) % (i + 1);
+    [sentDist[i], sentDist[j]] = [sentDist[j], sentDist[i]];
+  }
 
-  const articles = mockSources.map((src, i) => {
-    const s = sentPat[i];
-    const d = new Date(today); d.setDate(d.getDate() - ri(0, 5));
-    const titles = {
-      positive: [`${keyword} shows strong momentum in latest analysis`, `Why ${keyword} is trending positively this week`, `${keyword} reaches new milestone — experts optimistic`],
-      negative: [`Concerns raised over ${keyword} in recent reports`, `${keyword} faces criticism from analysts`, `Issues with ${keyword} spark online debate`],
-      neutral: [`Latest updates and developments around ${keyword}`, `What you need to know about ${keyword} today`, `${keyword} — a comprehensive week in review`]
-    };
-    const title = titles[s][i % titles[s].length];
-    const sent = analyzeSentiment(title);
+  const titleTemplates = {
+    positive: [
+      `${keyword} hits new high — investors and fans thrilled`,
+      `Why ${keyword} is dominating headlines this week`,
+      `${keyword} achieves major milestone, experts optimistic`,
+      `Strong momentum for ${keyword} as support grows`,
+      `${keyword} gets glowing reception from analysts`,
+    ],
+    negative: [
+      `Concerns mount over ${keyword} amid growing backlash`,
+      `${keyword} under scrutiny — critics raise red flags`,
+      `Analysts warn about risks surrounding ${keyword}`,
+      `${keyword} faces controversy in latest developments`,
+      `Public debate intensifies as ${keyword} draws criticism`,
+    ],
+    neutral: [
+      `Latest updates and developments around ${keyword}`,
+      `What you need to know about ${keyword} today`,
+      `${keyword} — a comprehensive week in review`,
+      `Tracking ${keyword}: numbers, trends and analysis`,
+      `${keyword} in focus: balanced coverage roundup`,
+    ],
+  };
+
+  const articles = mockSources.slice(0, total).map((src, i) => {
+    const s = sentDist[i] || "neutral";
+    const d = new Date(today);
+    d.setDate(d.getDate() - ri(0, 6));
+    const titlePool = titleTemplates[s];
+    const title = titlePool[i % titlePool.length];
+    const scoreMap = { positive: +(0.3 + (seededRand(0,5,i) * 0.1)).toFixed(2), negative: -(0.3 + (seededRand(0,5,i+1) * 0.1)).toFixed(2), neutral: 0.0 };
     return {
-      id: i + 1, title,
+      id: i + 1,
+      title,
       source: src.name,
       source_type: src.type,
       date: fmtDate(d),
-      sentiment: sent.label,
-      sentiment_score: parseFloat(sent.score.toFixed(2)),
-      summary: `This ${src.type.toLowerCase()} from ${src.name} covers the latest developments around ${keyword}. The piece highlights key trends and reactions observed over the past week.`,
+      sentiment: s,
+      sentiment_score: scoreMap[s],
+      summary: `This ${src.type.toLowerCase()} from ${src.name} covers the latest developments around ${keyword}. The piece highlights key trends and public reactions observed over the past week.`,
       url: src.url(keyword),
-      tags: [keyword.split(" ")[0].toLowerCase(), src.type.toLowerCase(), "trending"],
+      tags: [keyword.split(" ")[0].toLowerCase(), src.type.toLowerCase(), overall.toLowerCase()],
       credibility: src.type === "News" ? ri(72, 95) : src.type === "Blog" ? ri(55, 80) : ri(40, 65)
     };
   });
 
-  const pos = articles.filter(a => a.sentiment === "positive").length;
-  const neg = articles.filter(a => a.sentiment === "negative").length;
-  const total = articles.length;
-  const pct_pos = Math.round((pos / total) * 100);
-  const pct_neg = Math.round((neg / total) * 100);
-  const pct_neu = 100 - pct_pos - pct_neg;
-  const overall = pct_pos >= 50 ? "Positive" : pct_neg >= 50 ? "Negative" : pct_pos > pct_neg ? "Mixed" : "Neutral";
-
+  // ── Sources breakdown ──────────────────────────────────────────────────────
   const srcMap = {};
   articles.forEach(a => {
     if (!srcMap[a.source]) srcMap[a.source] = { source: a.source, count: 0, type: a.source_type };
     srcMap[a.source].count++;
   });
+
+  // ── Trend data: seeded so each keyword has unique historical shape ─────────
+  const trendBase = seededRand(5, 15, 11);
+  const trendVariance = (offset) => Math.max(1, trendBase + seededRand(-3, 3, offset));
 
   return {
     keyword,
@@ -217,20 +266,24 @@ function generateDemoData(keyword) {
     sentiment_negative: pct_neg,
     sentiment_neutral: pct_neu,
     overall_sentiment: overall,
-    summary: `Real-time monitoring of "${keyword}" tracked ${total} articles across news sites, blogs, and social platforms. Overall sentiment is ${overall.toLowerCase()}, with ${pct_pos}% positive, ${pct_neg}% negative, and ${pct_neu}% neutral coverage.`,
-    key_insight: pct_pos >= 50
-      ? `Majority (${pct_pos}%) of mentions about "${keyword}" are positive — strong public interest detected.`
+    summary: `Real-time monitoring of "${keyword}" tracked ${total} articles across news, blogs, and social platforms. Overall sentiment is ${overall.toLowerCase()}, with ${pct_pos}% positive, ${pct_neg}% negative, and ${pct_neu}% neutral coverage. Public interest remains ${pct_pos > 50 ? "strong and largely favourable" : pct_neg > 40 ? "cautious with notable criticism" : "balanced with active discussion"}.`,
+    key_insight: pct_pos >= 55
+      ? `Majority (${pct_pos}%) of mentions about "${keyword}" are positive — strong public interest and favourable reception detected.`
       : pct_neg >= 40
-        ? `A significant ${pct_neg}% of coverage is negative — monitor closely for reputational impact.`
-        : `Coverage of "${keyword}" is balanced — active multi-sided discussion detected.`,
-    trending_keywords: [keyword.split(" ")[0], "trending", "analysis", "update", "news", "india", "latest", "report", "review", "2026"],
+        ? `A significant ${pct_neg}% of coverage around "${keyword}" is negative — monitor closely for reputational impact.`
+        : `Coverage of "${keyword}" is balanced at ${pct_pos}% positive — active multi-sided discussion detected across sources.`,
+    trending_keywords: [
+      keyword.split(" ")[0],
+      "trending", "analysis", "update", "news",
+      "india", "latest", "report", "review", "2026"
+    ],
     sources_breakdown: Object.values(srcMap).sort((a, b) => b.count - a.count).slice(0, 6),
     articles,
     trend_data: {
       labels: ["Week 1", "Week 2", "Week 3", "Week 4", "This Week"],
-      positive: [ri(5, 15), ri(8, 18), ri(10, 20), ri(12, 22), pos],
-      negative: [ri(2, 8), ri(3, 9), ri(4, 10), ri(3, 8), neg],
-      neutral: [ri(3, 10), ri(4, 11), ri(5, 12), ri(4, 10), total - pos - neg]
+      positive: [trendVariance(1), trendVariance(2), trendVariance(3), trendVariance(4), nPos],
+      negative: [trendVariance(5), trendVariance(6), trendVariance(7), trendVariance(8), nNeg],
+      neutral:  [trendVariance(9), trendVariance(10), trendVariance(11), trendVariance(12), Math.max(0, nNeu)]
     }
   };
 }
