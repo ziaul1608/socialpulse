@@ -103,7 +103,72 @@ function TrendChart({ trend }) {
   return <canvas ref={ref} style={{ maxHeight: 230 }} />;
 }
 
-// Opens the real article URL. If URL is missing/invalid, falls back to Google News search.
+// AI Insight Summary Box
+function AIInsightBox({ data }) {
+  const sentiment = (data?.overall_sentiment || "neutral").toLowerCase();
+  const sentimentColors = {
+    positive: { bg: "rgba(74,222,128,0.07)", border: "rgba(74,222,128,0.25)", icon: "🟢", label: "Positive", color: "#4ade80" },
+    negative: { bg: "rgba(248,113,113,0.07)", border: "rgba(248,113,113,0.25)", icon: "🔴", label: "Negative", color: "#f87171" },
+    neutral: { bg: "rgba(148,163,184,0.07)", border: "rgba(148,163,184,0.2)", icon: "⚪", label: "Neutral", color: "#94a3b8" },
+  };
+  const sc = sentimentColors[sentiment] || sentimentColors.neutral;
+  const topThemes = (data?.trending_keywords || []).slice(0, 3).join(", ");
+
+  return (
+    <div style={{
+      background: sc.bg,
+      border: `1px solid ${sc.border}`,
+      borderRadius: 14,
+      padding: "18px 22px",
+      marginBottom: 20,
+      display: "flex",
+      gap: 16,
+      alignItems: "flex-start",
+    }}>
+      {/* Left: icon strip */}
+      <div style={{
+        width: 44, height: 44, borderRadius: 12,
+        background: `${sc.color}18`,
+        border: `1px solid ${sc.color}40`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 22, flexShrink: 0
+      }}>
+        🤖
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: sc.color, textTransform: "uppercase" }}>
+            AI Insight Summary
+          </span>
+          <span style={{
+            background: `${sc.color}18`, color: sc.color,
+            fontSize: 10, fontWeight: 700, padding: "2px 10px",
+            borderRadius: 10, textTransform: "uppercase", letterSpacing: 0.5
+          }}>
+            {sc.icon} {sc.label} Sentiment
+          </span>
+        </div>
+        <div style={{ fontSize: 14, color: "#c4b5fd", lineHeight: 1.75 }}>
+          <strong style={{ color: "#e2e2f0" }}>"{data?.keyword}"</strong> is currently getting mostly{" "}
+          <strong style={{ color: sc.color }}>{sc.label.toLowerCase()} sentiment</strong> across{" "}
+          <strong style={{ color: "#67e8f9" }}>{data?.total_mentions || 0} articles</strong>.{" "}
+          {topThemes && (
+            <>
+              Most articles are related to{" "}
+              <strong style={{ color: "#a78bfa" }}>{topThemes}</strong>.{" "}
+            </>
+          )}
+          {data?.sentiment_positive > 60 && "Public reception appears largely favourable. "}
+          {data?.sentiment_negative > 60 && "There is notable concern or criticism around this topic. "}
+          {data?.key_insight && (
+            <span style={{ color: "#888899" }}>{data.key_insight}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function openArticle(url, title) {
   const isValid = url && url !== "undefined" && url !== "" && !url.startsWith("https://news.google.com/search");
   if (isValid) {
@@ -134,7 +199,7 @@ function dl(blob, name) {
   a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
 }
 
-export default function Dashboard({ keyword, data, loading, error, onBack, onNewSearch }) {
+export default function Dashboard({ keyword, data, loading, error, onBack, onNewSearch, onCompare }) {
   const [newKw, setNewKw] = useState("");
   const [filter, setFilter] = useState("all");
   const [sortBy, setSortBy] = useState("date");
@@ -151,6 +216,11 @@ export default function Dashboard({ keyword, data, loading, error, onBack, onNew
         <div style={{ width: 30, height: 30, background: "linear-gradient(135deg,#6c63ff,#a78bfa)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>📡</div>
         <div style={{ fontWeight: 800, color: "#fff", fontSize: 15, fontFamily: "'Space Grotesk',sans-serif" }}>SocialPulse</div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            onClick={onCompare}
+            style={{ background: "#1a1a2e", border: "1px solid #6c63ff55", borderRadius: 8, padding: "7px 14px", color: "#a78bfa", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'Space Grotesk',sans-serif" }}>
+            ⚔️ Compare
+          </button>
           <div style={{ background: "#1a1a2e", border: "1px solid #2a2a45", borderRadius: 8, padding: "6px 14px", display: "flex", gap: 8, alignItems: "center" }}>
             <input value={newKw} onChange={e => setNewKw(e.target.value)}
               onKeyDown={e => e.key === "Enter" && newKw.trim() && onNewSearch(newKw.trim())}
@@ -206,6 +276,9 @@ export default function Dashboard({ keyword, data, loading, error, onBack, onNew
                 </span>
               </div>
             </div>
+
+            {/* ✨ AI INSIGHT SUMMARY BOX */}
+            <AIInsightBox data={data} />
 
             {/* Stats */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 12, marginBottom: 22 }}>
