@@ -20,7 +20,13 @@ const FEATURES = [
   ["⬇", "Export Reports", "Download all results as CSV or JSON for your presentation"],
 ];
 
-export default function SearchPage({ onSearch, history }) {
+const SENT_COLOR = {
+  positive: "#4ade80",
+  negative: "#f87171",
+  neutral: "#94a3b8",
+};
+
+export default function SearchPage({ onSearch, history, onCompare }) {
   const [input, setInput] = useState("");
 
   return (
@@ -32,8 +38,18 @@ export default function SearchPage({ onSearch, history }) {
           <div style={{ fontWeight: 800, fontSize: 17, color: "#fff" }}>SocialPulse</div>
           <div style={{ fontSize: 11, color: "#555575" }}>Social Media Listening Tool</div>
         </div>
-        <div style={{ marginLeft: "auto", background: "#1a1a2e", border: "1px solid #2a2a45", borderRadius: 20, padding: "4px 14px", fontSize: 11, color: "#a78bfa", fontWeight: 700 }}>
-          AI + WEB SCRAPING
+        <div style={{ marginLeft: "auto", display: "flex", gap: 10, alignItems: "center" }}>
+          <button
+            onClick={onCompare}
+            style={{ background: "linear-gradient(135deg,#1a1a35,#252550)", border: "1px solid #6c63ff55", borderRadius: 20, padding: "6px 18px", fontSize: 12, color: "#a78bfa", fontWeight: 700, cursor: "pointer", fontFamily: "'Space Grotesk',sans-serif", display: "flex", alignItems: "center", gap: 6 }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "#6c63ff"; e.currentTarget.style.background = "#1e1e40"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "#6c63ff55"; e.currentTarget.style.background = "linear-gradient(135deg,#1a1a35,#252550)"; }}
+          >
+            ⚔️ Compare Keywords
+          </button>
+          <div style={{ background: "#1a1a2e", border: "1px solid #2a2a45", borderRadius: 20, padding: "4px 14px", fontSize: 11, color: "#a78bfa", fontWeight: 700 }}>
+            AI + WEB SCRAPING
+          </div>
         </div>
       </div>
 
@@ -92,16 +108,60 @@ export default function SearchPage({ onSearch, history }) {
           ))}
         </div>
 
-        {/* History */}
+        {/* ---- SEARCH HISTORY DASHBOARD ---- */}
         {history.length > 0 && (
-          <div style={{ maxWidth: 640, width: "100%" }}>
-            <div style={{ fontSize: 11, color: "#555575", fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", marginBottom: 10 }}>Recent Searches</div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ maxWidth: 820, width: "100%", marginBottom: 32 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <div style={{ fontSize: 11, color: "#6c63ff", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>🕐 Recent Searches</div>
+              <div style={{ flex: 1, height: 1, background: "#1a1a2e" }} />
+            </div>
+            <div style={{ background: "#0d0d1a", border: "1px solid #1a1a2e", borderRadius: 14, overflow: "hidden" }}>
+              {/* Table Header */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 12, padding: "10px 18px", background: "#111120", borderBottom: "1px solid #1a1a2e" }}>
+                <div style={{ fontSize: 11, color: "#555575", fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase" }}>Keyword</div>
+                <div style={{ fontSize: 11, color: "#555575", fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", textAlign: "center", minWidth: 80 }}>Articles</div>
+                <div style={{ fontSize: 11, color: "#555575", fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", textAlign: "center", minWidth: 80 }}>Sentiment</div>
+                <div style={{ fontSize: 11, color: "#555575", fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", textAlign: "center", minWidth: 60 }}>Action</div>
+              </div>
               {history.map((h, i) => (
-                <button key={i} onClick={() => onSearch(h)}
-                  style={{ background: "#1a1a2e", border: "1px solid #2a2a45", borderRadius: 8, padding: "5px 14px", fontSize: 12, color: "#c4b5fd", cursor: "pointer", fontFamily: "'Space Grotesk',sans-serif" }}>
-                  🕐 {h}
-                </button>
+                <div key={i}
+                  style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 12, padding: "12px 18px", borderBottom: i < history.length - 1 ? "1px solid #111120" : "none", alignItems: "center", transition: "background 0.15s", cursor: "pointer" }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "#131328"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                  onClick={() => onSearch(h.keyword)}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 14, color: "#c4b5fd", fontWeight: 600 }}>{h.keyword}</span>
+                  </div>
+                  <div style={{ textAlign: "center", minWidth: 80 }}>
+                    {h.articles !== undefined ? (
+                      <span style={{ fontSize: 13, color: "#67e8f9", fontWeight: 700 }}>{h.articles} articles</span>
+                    ) : (
+                      <span style={{ fontSize: 11, color: "#333355", fontStyle: "italic" }}>pending...</span>
+                    )}
+                  </div>
+                  <div style={{ textAlign: "center", minWidth: 80 }}>
+                    {h.sentiment ? (
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: "3px 12px", borderRadius: 12, textTransform: "capitalize",
+                        background: `${SENT_COLOR[h.sentiment?.toLowerCase()] || "#94a3b8"}18`,
+                        color: SENT_COLOR[h.sentiment?.toLowerCase()] || "#94a3b8"
+                      }}>
+                        {h.sentiment}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 11, color: "#333355", fontStyle: "italic" }}>—</span>
+                    )}
+                  </div>
+                  <div style={{ textAlign: "center", minWidth: 60 }}>
+                    <button
+                      onClick={e => { e.stopPropagation(); onSearch(h.keyword); }}
+                      style={{ background: "#1a1a35", border: "1px solid #2a2a50", borderRadius: 6, padding: "4px 10px", color: "#a78bfa", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "'Space Grotesk',sans-serif" }}
+                    >
+                      ↻ Re-run
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
